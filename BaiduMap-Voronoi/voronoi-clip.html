@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="UTF-8">
+    <script type="text/javascript" src="http://api.map.baidu.com/api?v=3.0&ak=af7Vb8FY6HGDym8m8vPGdjbb8byzCSEz">
+    </script>
+    <script type="text/javascript" src="voronoi-clip.js"></script>
+    <style type="text/css">
+        body,
+        html,
+        #container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            margin: 0;
+            font-family: "微软雅黑";
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+</body>
+
+</html>
+
+<script type="text/javascript">
+    var map = new BMap.Map("container");
+    map.enableScrollWheelZoom();
+    /* map.addEventListener("click", function (e) {
+            console.log(e.point.lng + ", " + e.point.lat);
+    }); */
+
+    map.centerAndZoom(new BMap.Point(118.005, 31.993), 12);
+    var boundsTmp = [
+        [117.88192672376843, 32.124299698776554],
+        [118.0089830550997, 32.18397138055797],
+        [118.05267663510503, 32.10032210379563],
+        [118.23952418118044, 32.09885388121611],
+        [118.15731126090726, 31.911215275001734],
+        [117.81027787629259, 31.818539376904567],
+        [117.90830097354137, 31.776555897779417],
+    ];
+    var bounds = [];
+    boundsTmp.forEach(b => {
+        bounds.push({
+            x: b[0],
+            y: b[1]
+        });
+    });
+    let sitesTmp = [
+        [118.0090549195405, 32.01445225494852],
+        [118.01505560034715, 32.04084003393365],
+        [117.95957625205092, 31.98842430811128],
+        [118.06564816666912, 31.987934298752545]
+    ];
+    var sites = [];
+    var i = 0;
+    sitesTmp.forEach(s => {
+        sites.push({
+            x: s[0],
+            y: s[1],
+            fill: (i++ % 2 == 0 ? "#0F0" : "#00F"), // 填充颜色
+            color: "#000", // 站点颜色（可选，不设置则默认使用边框颜色）
+            size: 6 // 站点大小（可选，不设置则不显示站点）
+        });
+    });
+
+    // 计算voronoi，并在百度地图上裁剪呈现
+    showVoronoi({
+        bounds: bounds, // 边框数组
+        sites: sites, // 站点数组
+        map: map, // 百度地图
+        strokeStyle: "#FFF", // 边框颜色
+        lineWidth: 2, // 边框线宽
+        globalAlpha: 0.6, // 透明度
+    });
+</script>

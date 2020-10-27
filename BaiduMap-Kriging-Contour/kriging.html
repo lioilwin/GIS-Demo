@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>克里金等值面展示示例</title>
+	<script type="text/javascript" src="http://api.map.baidu.com/api?v=3.0&ak=af7Vb8FY6HGDym8m8vPGdjbb8byzCSEz">
+	</script>
+	<script type="text/javascript" src="kriging-contour.js"></script>
+	<style type="text/css">
+		body,
+		html,
+		#container {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			margin: 0;
+			font-family: "微软雅黑";
+		}
+	</style>
+</head>
+
+<body>
+	<button onclick="showKrigingVector()">克里金矢量(Vector)</button>
+	<button onclick="showKrigingImage()">克里金图像(Image)</button>
+	<div id="container"></div>
+	<script type="text/javascript">
+		var mapCenter = [118, 32];
+		var map = new BMap.Map("container");
+		map.enableScrollWheelZoom();
+		map.centerAndZoom(new BMap.Point(118, 32), 12);
+		/* map.addEventListener("click", function (e) {
+			console.log(e.point.lng + ", " + e.point.lat);
+		}); */
+
+		let dataset = {
+			"type": "FeatureCollection",
+			"features": []
+		};
+		// 生成测试数据1
+		/* for (let i = 0; i < 100; i++) {
+			let lv = Math.round(Math.random() * 100);
+			let coor = [mapCenter[0] + Math.random() * 0.1 - .05, mapCenter[1] + Math.random() * 0.1 - .05];
+			let feature = {
+				"type": "Feature",
+				"properties": {
+					"level": lv
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": coor
+				}
+			};
+			dataset.features.push(feature);
+
+			var myLabel = new BMap.Label(lv, {
+				position: new BMap.Point(coor[0], coor[1]),
+				enableMassClear: false
+			});
+			myLabel.setZIndex(1);
+			map.addOverlay(myLabel);
+		} */
+		// 生成测试数据2
+		let tmp = [
+			[118.0090549195405, 32.01445225494852, 0],
+			[118.01505560034715, 32.04084003393365, 30],
+			[117.95957625205092, 31.98842430811128, 60],
+			[118.06564816666912, 31.987934298752545, 90]
+		]
+		tmp.forEach(t => {
+			let feature = {
+				"type": "Feature",
+				"properties": {
+					"level": t[2]
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [t[0], t[1]]
+				}
+			};
+			dataset.features.push(feature);
+
+			var myLabel = new BMap.Label(t[2], {
+				position: new BMap.Point(t[0], t[1]),
+				enableMassClear: false
+			});
+			myLabel.setZIndex(1);
+			map.addOverlay(myLabel);
+		});
+
+		// 克里金参数
+		var params = {
+			// 变异函数模型：指数、高斯、球面
+			model: 'exponential', //'exponential','gaussian','spherical'
+			sigma2: 0,
+			alpha: 100,
+			globalAlpha: 0.6,
+			// 分段值和颜色
+			colors: ["#006837", "#1a9850", "#66bd63", "#a6d96a", "#d9ef8b", "#ffffbf", "#fee08b",
+				"#fdae61", "#f46d43", "#d73027", "#a50026"
+			],
+			breaks: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+			// 边界
+			bounds: [
+				[117.88192672376843, 32.124299698776554],
+				[118.0089830550997, 32.18397138055797],
+				[118.05267663510503, 32.10032210379563],
+				[118.23952418118044, 32.09885388121611],
+				[118.15731126090726, 31.911215275001734],
+				[117.81027787629259, 31.818539376904567],
+				[117.90830097354137, 31.776555897779417],
+			],
+			width: 200 // 横向网格多少（kriging精确度）
+		}
+		params.breakColors = {}; // 分段值和颜色对应关系
+		for (let i = 0; i < params.breaks.length; i++)
+			params.breakColors[params.breaks[i]] = params.colors[i];
+
+		// 克里金矢量(Vector)
+		function showKrigingVector() {
+			map.clearOverlays();
+			let contours;
+			try {
+				// 判断所有数据值是否不同
+				let diff = false;
+				let last;
+				dataset.features.forEach(f => {
+					let cur = f.properties.level;
+					if (last && cur != last) {
+						diff = true;
+						return;
+					}
+					last = cur;
+				});
+				// 只有数据值不一致，才采用Kriging插值计算
+				if (diff)
+					contours = kriging.getVectorContour(dataset, 'level', params, params.breaks);
+			} catch (err) {
+				console.log(err);
+			}
+			/* // 百度地图-多边形API实现
+			contours.features.forEach(feature => {
+				let color = params.breakColors[feature.properties.value];
+				feature.geometry.coordinates.forEach(coors => {
+					let points = [];
+					coors.forEach(coor => points.push(new BMap.Point(coor[0], coor[1])));
+					map.addOverlay(new BMap.Polygon(points, {
+						fillColor: color,
+						fillOpacity: 0.5,
+						strokeColor: "#000",
+						strokeWeight: 1,
+						strokeOpacity: 1
+					}));
+				});
+			}); */
+			// 百度地图-Canvas实现
+			map.addOverlay(new BMap.CanvasLayer({
+				update: function () {
+					let ctx = this.canvas.getContext('2d');
+					ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+					ctx.globalAlpha = params.globalAlpha;
+					ctx.beginPath();
+					ctx.lineWidth = 0.01;
+					let bounds = params.bounds;
+					for (var i = 0; i < bounds.length; i++) {
+						var p = toPx(bounds[i]);
+						if (i == 0)
+							ctx.moveTo(p.x, p.y);
+						else
+							ctx.lineTo(p.x, p.y);
+					}
+					ctx.closePath();
+					// 计算结果异常处理
+					if (!contours || contours.features.length == 0) {
+						let breaks = params.breaks;
+						let bi = breaks.length - 1;
+						for (let i = 1; i < breaks.length; i++) {
+							let lv = dataset.features[0].properties.level;
+							if (lv < breaks[i]) {
+								bi = i - 1;
+								break;
+							}
+						}
+						ctx.fillStyle = params.breakColors[breaks[bi]];
+						ctx.fill();
+					}
+					ctx.save();
+					ctx.clip();
+					if (contours) {
+						contours.features.forEach(feature => {
+							ctx.fillStyle = params.breakColors[feature.properties.value];
+							ctx.beginPath();
+							feature.geometry.coordinates.forEach(coors => {
+								for (var i = 0; i < coors.length; i++) {
+									var p = toPx(coors[i]);
+									if (i == 0)
+										ctx.moveTo(p.x, p.y);
+									else
+										ctx.lineTo(p.x, p.y);
+								}
+								ctx.closePath();
+							});
+							ctx.save();
+							ctx.globalCompositeOperation = "destination-out";
+							ctx.fill();
+							ctx.restore();
+							ctx.fill();
+						});
+					}
+					ctx.restore();
+				}
+			}));
+
+			function toPx(p) {
+				return map.pointToPixel(new BMap.Point(p[0], p[1]));
+			}
+		}
+
+		// 克里金图像(Image)
+		function showKrigingImage() {
+			map.clearOverlays();
+			map.addOverlay(new BMap.CanvasLayer({
+				update: function () {
+					var bs = map.getBounds();
+					var sw = bs.getSouthWest();
+					var ne = bs.getNorthEast();
+					this.canvas.getContext('2d').globalAlpha = params.globalAlpha;
+					kriging.drawCanvasContour(dataset, 'level', params, this.canvas,
+						[sw.lng, ne.lng], [sw.lat, ne.lat], params.colors);
+				}
+			}));
+		}
+	</script>
+</body>
+
+</html>
